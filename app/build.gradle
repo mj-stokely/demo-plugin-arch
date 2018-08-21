@@ -1,0 +1,86 @@
+apply plugin: 'com.android.application'
+
+apply plugin: 'kotlin-android'
+
+apply plugin: 'kotlin-android-extensions'
+
+android {
+    compileSdkVersion 28
+    defaultConfig {
+        applicationId "com.mjstokely.plugindemo"
+        minSdkVersion 21
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // This is the mechanism I'm using to conditionally include source folders for the plugins. There are many ways to handle
+    // this particular piece of the puzzle, this one probably isn't the best as it requires some AndroidManifest manipulation below.
+    //
+    sourceSets {
+        main {
+            file('src/plugins')
+                    .listFiles()
+                    .each {
+                java.srcDirs += it.path + "/java"
+                res.srcDirs += it.path + "/res"
+            }
+
+        }
+    }
+
+}
+
+// Because source folders are manually added above, need to have some no-frills AndroidManifest merging ability so that host app's
+// manifest sees the Service declarations
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+
+        output.processManifest.doLast {
+            def xml
+            def mergedComponents = new StringWriter()
+            def xmlNodePrinter = new XmlNodePrinter(new PrintWriter(mergedComponents))
+
+            file('src/plugins')
+                    .listFiles()
+                    .each{
+                File mergeFile = new File("${it.path}/merge.xml")
+                xml = new XmlParser().parse(mergeFile)
+
+                println("loaded for ${it}\nroot node: ${xml.name()}")
+                xml.children().each { node ->
+                    println("tag: ${node.name()}, ${node.attributes()}")
+                    xmlNodePrinter.print(node)
+                }
+            }
+
+            println("MERGED\n" + mergedComponents.toString())
+
+            File manifestOutFile = file("$manifestOutputDirectory/AndroidManifest.xml")
+            if (manifestOutFile.exists()) {
+                println("FOR OUTPUT: " + output.name)
+                def newFileContents = manifestOutFile
+                        .getText('UTF-8')
+                        .replace("</application>", mergedComponents.toString() + "</application>")
+                manifestOutFile.write(newFileContents, 'UTF-8')
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "com.android.support:appcompat-v7:$rootProject.supportLibVersion"
+    implementation "com.android.support:recyclerview-v7:$rootProject.supportLibVersion"
+
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+}

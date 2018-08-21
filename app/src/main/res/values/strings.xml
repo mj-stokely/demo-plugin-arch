@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Demo Plugin Architecture</string>
+
+    <string name="public_product_a">Public Product A</string>
+    <string name="public_product_b">Public Product B</string>
+</resources>
